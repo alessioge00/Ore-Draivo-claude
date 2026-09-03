@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le mie ore</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Le mie ore">
+<meta name="theme-color" content="#12161d">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#12161d;
+    --surface:#1b212b;
+    --surface-2:#232a35;
+    --line:#2b3340;
+    --text:#e9ecf1;
+    --muted:#8b93a1;
+    --accent:#4fb3a5;      /* lancetta - tempo */
+    --accent-dim:#3a8478;
+    --gold:#e0a94f;        /* contachilometri - denaro */
+    --danger:#d9695f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);}
+  body{
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    padding-bottom:48px;
+    min-height:100vh;
+  }
+  .wrap{max-width:520px; margin:0 auto; padding:0 16px;}
+
+  header.top{
+    padding:calc(env(safe-area-inset-top, 0px) + 22px) 0 16px;
+    background:var(--surface); border-bottom:1px solid var(--line);
+    margin-bottom:20px;
+  }
+  header.top .inner{
+    max-width:520px; margin:0 auto; padding:0 16px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  header.top h1{
+    font-size:21px; font-weight:700; letter-spacing:-0.01em; margin:0; color:var(--text);
+    display:flex; align-items:center; gap:8px;
+  }
+  header.top h1 .dot{
+    width:9px; height:9px; border-radius:50%; background:var(--accent);
+    box-shadow:0 0 0 3px rgba(79,179,165,0.18);
+  }
+  .gear{
+    background:none; border:none; color:var(--muted); font-size:19px;
+    padding:6px; line-height:1; cursor:pointer;
+  }
+  .gear:active{color:var(--text);}
+
+  /* ---- Odometer stat strip ---- */
+  .stats{
+    display:grid; grid-template-columns:1fr 1fr; gap:1px;
+    background:var(--line); border:1px solid var(--line);
+    border-radius:10px; overflow:hidden; margin-bottom:18px;
+  }
+  .stat{background:var(--surface); padding:14px 14px 12px;}
+  .stat .label{font-size:12.5px; color:var(--muted); margin-bottom:6px;}
+  .stat .value{
+    font-variant-numeric:tabular-nums; font-feature-settings:"tnum";
+    font-size:20px; font-weight:650; letter-spacing:-0.01em;
+  }
+  .stat.money .value{color:var(--gold);}
+  .stat.paid .value{color:var(--accent);}
+  .stat.due .value{color:var(--text);}
+
+  /* ---- Timer panel ---- */
+  .timer-panel{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:20px 16px; margin-bottom:18px; text-align:center;
+  }
+  .timer-status{font-size:13px; color:var(--muted); margin-bottom:6px; min-height:16px;}
+  .timer-display{
+    font-variant-numeric:tabular-nums; font-feature-settings:"tnum";
+    font-size:40px; font-weight:300; letter-spacing:0.02em; color:var(--text);
+    margin-bottom:16px;
+  }
+  .timer-display.idle{color:var(--muted);}
+  button.big{
+    width:100%; border:none; border-radius:9px; padding:14px 16px;
+    font-size:16px; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  button.big.start{background:var(--accent); color:#0d1512;}
+  button.big.start:active{background:var(--accent-dim);}
+  button.big.stop{background:var(--danger); color:#1a0d0b;}
+  button.big.stop:active{background:#bb564d;}
+
+  .link-btn{
+    display:block; width:100%; text-align:center; box-sizing:border-box;
+    background:var(--surface); border:1px solid var(--line); border-radius:9px;
+    color:var(--accent); font-size:14.5px; font-weight:650; letter-spacing:0.01em;
+    padding:13px 0; margin-bottom:18px; cursor:pointer;
+  }
+  .link-btn:active{background:var(--surface-2);}
+
+  /* ---- Manual entry form ---- */
+  .form-panel{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:16px; margin-bottom:18px; display:none;
+  }
+  .form-panel.open{display:block;}
+  .form-panel h2{font-size:15px; font-weight:650; margin:0 0 14px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px;}
+  .field input, .field select{
+    width:100%; min-width:0; max-width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:11px 8px; font-size:15px; font-family:inherit;
+    -webkit-appearance:none; appearance:none;
+  }
+  .field input[type=date], .field input[type=time], .field input[type=month]{
+    color-scheme:dark;
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--accent); outline-offset:0;}
+  .row2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px;}
+  .seg{display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .seg button{
+    flex:1; background:var(--surface-2); border:none; color:var(--muted);
+    padding:10px 4px; font-size:13.5px; cursor:pointer; border-right:1px solid var(--line);
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.sel{background:var(--accent); color:#0d1512; font-weight:600;}
+  .seg.seg-sede button{font-size:12px; line-height:1.25; padding:9px 4px; white-space:normal;}
+  .field .note-input{margin-top:8px;}
+  .form-actions{display:flex; gap:10px; margin-top:4px;}
+  .form-actions button{flex:1; padding:12px; border-radius:8px; border:none; font-size:15px; font-weight:600; cursor:pointer;}
+  .btn-save{background:var(--accent); color:#0d1512;}
+  .btn-cancel{background:var(--surface-2); color:var(--muted); border:1px solid var(--line) !important;}
+
+  /* ---- Month + records ---- */
+  .month-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:10px;}
+  .month-row h2{
+    font-size:14px; font-weight:650; margin:0; flex-shrink:0; color:var(--text);
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    padding:9px 12px;
+  }
+  .month-row input[type=month]{
+    background:var(--surface); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:8px 10px; font-size:14px; font-family:inherit;
+    min-width:0; max-width:150px; color-scheme:dark; -webkit-appearance:none; appearance:none;
+  }
+  .records{background:var(--surface); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:22px;}
+  .rec{padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:10px;}
+  .rec:last-child{border-bottom:none;}
+  .rec .left .type{font-size:14.5px; font-weight:600;}
+  .rec .left .meta{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .rec .right{text-align:right; flex-shrink:0;}
+  .rec .right .amount{font-variant-numeric:tabular-nums; font-size:15px; font-weight:650;}
+  .rec .right .badge{
+    display:inline-block; font-size:11px; padding:2px 7px; border-radius:20px; margin-top:4px;
+  }
+  .badge.paid{background:rgba(79,179,165,0.16); color:var(--accent);}
+  .badge.due{background:rgba(224,169,79,0.16); color:var(--gold);}
+  .rec .actions{display:flex; gap:6px; margin-top:6px; justify-content:flex-end;}
+  .rec .actions button{
+    background:none; border:1px solid var(--line); color:var(--muted);
+    font-size:11.5px; padding:4px 8px; border-radius:6px; cursor:pointer;
+  }
+  .empty{padding:26px 14px; text-align:center; color:var(--muted); font-size:14px;}
+
+  /* ---- Settings / backup ---- */
+  .section{margin-bottom:22px;}
+  .section h2{
+    font-size:14px; font-weight:650; margin:0 0 10px; color:var(--text); display:inline-block;
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    padding:9px 12px;
+  }
+  .section p.note{font-size:13px; color:var(--muted); line-height:1.5; margin:0 0 12px;}
+  .backup-row{display:flex; gap:10px;}
+  .backup-row button{
+    flex:1; padding:12px; border-radius:8px; border:1px solid var(--line);
+    background:var(--surface); color:var(--text); font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .backup-row button:active{background:var(--surface-2);}
+  input[type=file]{display:none;}
+
+  .settings-panel{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:16px; margin-bottom:18px; display:none;
+  }
+  .settings-panel.open{display:block;}
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:10px 16px; border-radius:8px; font-size:13.5px; opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; z-index:50; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <h1><span class="dot"></span>Le mie ore</h1>
+    <button class="gear" id="gearBtn" aria-label="Impostazioni">⚙</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="stats">
+    <div class="stat time"><div class="label">Ore mese</div><div class="value" id="statHours">0h 00m</div></div>
+    <div class="stat money"><div class="label">Totale maturato</div><div class="value" id="statTotal">€0,00</div></div>
+    <div class="stat paid"><div class="label">💰 Incassato</div><div class="value" id="statPaid">€0,00</div></div>
+    <div class="stat due"><div class="label">⏳ Da incassare</div><div class="value" id="statDue">€0,00</div></div>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <h2>Impostazioni</h2>
+    <div class="field">
+      <label for="rateInput">Tariffa oraria (€/h)</label>
+      <input type="number" id="rateInput" min="0" step="0.5" inputmode="decimal">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label for="bonusInput">Bonus auto propria per uscita (€)</label>
+      <input type="number" id="bonusInput" min="0" step="1" inputmode="decimal">
+    </div>
+    <div class="form-actions" style="margin-top:14px">
+      <button class="btn-cancel" id="settingsClose">Chiudi</button>
+      <button class="btn-save" id="settingsSave">Salva</button>
+    </div>
+  </div>
+
+  <div class="timer-panel">
+    <div class="timer-status" id="timerStatus">Nessun lavoro in corso</div>
+    <div class="timer-display idle" id="timerDisplay">00:00:00</div>
+    <button class="big start" id="timerBtn">▶️ INIZIA LAVORO</button>
+  </div>
+
+  <button class="link-btn" id="toggleFormBtn">＋ INSERISCI MANUALMENTE</button>
+
+  <div class="form-panel" id="formPanel">
+    <h2 id="formTitle">Nuova registrazione</h2>
+    <div class="field">
+      <label for="fDate">Data</label>
+      <input type="date" id="fDate">
+    </div>
+    <div class="field">
+      <label>Tipo</label>
+      <div class="seg" id="segTipo">
+        <button type="button" data-val="Esame">Esame</button>
+        <button type="button" data-val="Simulatore">Simulatore</button>
+        <button type="button" data-val="Commissione">Commissione</button>
+        <button type="button" data-val="Altro">Altro</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Sede</label>
+      <div class="seg seg-sede" id="segSede">
+        <button type="button" data-val="molassana">Draivo Molassana</button>
+        <button type="button" data-val="europa">Draivo Europa</button>
+        <button type="button" data-val="altro">Altro</button>
+      </div>
+      <input type="text" id="fSedeNota" class="note-input" placeholder="Nome della sede" style="display:none">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="fStart">Inizio</label>
+        <input type="time" id="fStart">
+      </div>
+      <div class="field">
+        <label for="fEnd">Fine</label>
+        <input type="time" id="fEnd">
+      </div>
+    </div>
+    <div class="field">
+      <label>Auto</label>
+      <div class="seg" id="segAuto">
+        <button type="button" data-val="scuola">Auto autoscuola</button>
+        <button type="button" data-val="mia">La mia auto</button>
+        <button type="button" data-val="nessuna">Nessuna</button>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:16px">
+      <label>Pagamento</label>
+      <div class="seg" id="segPagamento">
+        <button type="button" data-val="subito">💰 Pagato subito</button>
+        <button type="button" data-val="dopo">⏳ Da pagare</button>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="formCancel">Annulla</button>
+      <button class="btn-save" id="formSave">Salva</button>
+    </div>
+  </div>
+
+  <div class="month-row">
+    <h2>Mese</h2>
+    <input type="month" id="monthPicker">
+  </div>
+
+  <div class="section" style="margin-bottom:22px">
+    <h2 style="display:none">Registrazioni</h2>
+    <div class="records" id="recordsList"></div>
+  </div>
+
+  <div class="section">
+    <div class="month-row" style="margin-bottom:10px"><h2>Calendario</h2></div>
+    <button class="link-btn" id="toggleCalFormBtn">＋ AGGIUNGI AL CALENDARIO</button>
+
+    <div class="form-panel" id="calFormPanel">
+      <h2>Nuovo appuntamento</h2>
+      <div class="field">
+        <label for="calDate">Data</label>
+        <input type="date" id="calDate">
+      </div>
+      <div class="field">
+        <label>Tipo</label>
+        <div class="seg" id="segCalTipo">
+          <button type="button" data-val="Esame">Esame</button>
+          <button type="button" data-val="Simulatore">Simulatore</button>
+          <button type="button" data-val="Commissione">Commissione</button>
+          <button type="button" data-val="Altro">Altro</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Sede</label>
+        <div class="seg seg-sede" id="segCalSede">
+          <button type="button" data-val="molassana">Draivo Molassana</button>
+          <button type="button" data-val="europa">Draivo Europa</button>
+          <button type="button" data-val="altro">Altro</button>
+        </div>
+        <input type="text" id="calSedeNota" class="note-input" placeholder="Nome della sede" style="display:none">
+      </div>
+      <div class="field" id="calFasciaField">
+        <label>Fascia oraria</label>
+        <div class="seg" id="segCalFascia">
+          <button type="button" data-val="mattina">Mattina</button>
+          <button type="button" data-val="pomeriggio">Pomeriggio</button>
+        </div>
+      </div>
+      <div class="field" id="calOrarioField" style="display:none">
+        <label for="calOrario">Orario</label>
+        <input type="time" id="calOrario">
+      </div>
+      <div class="form-actions">
+        <button class="btn-cancel" id="calFormCancel">Annulla</button>
+        <button class="btn-save" id="calFormSave">Salva</button>
+      </div>
+    </div>
+
+    <div class="records" id="calendarList"></div>
+  </div>
+
+  <div class="section">
+    <h2>Backup</h2>
+    <p class="note">I dati restano sul dispositivo. Usa il backup per conservarne una copia in caso di cambio/reset dell'iPhone.</p>
+    <div class="backup-row">
+      <button id="exportBtn">Esporta backup</button>
+      <button id="importBtn">Importa backup</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json">
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORE_KEY = "leMieOre.records";
+  var SETTINGS_KEY = "leMieOre.settings";
+  var TIMER_KEY = "leMieOre.timer";
+
+  var defaultSettings = { rate: 10, bonus: 30 };
+
+  function load(key, fallback){
+    try{
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch(e){ return fallback; }
+  }
+  function save(key, val){
+    localStorage.setItem(key, JSON.stringify(val));
+  }
+
+  var records = load(STORE_KEY, []);
+  var settings = Object.assign({}, defaultSettings, load(SETTINGS_KEY, {}));
+  var timer = load(TIMER_KEY, null); // { startISO }
+
+  // ---------- helpers ----------
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  function pad(n){ return n < 10 ? "0"+n : ""+n; }
+
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  }
+  function nowTimeStr(){
+    var d = new Date();
+    return pad(d.getHours())+":"+pad(d.getMinutes());
+  }
+  function currentMonthStr(){
+    var d = new Date();
+    return d.getFullYear()+"-"+pad(d.getMonth()+1);
+  }
+
+  function euro(n){
+    return "€" + n.toFixed(2).replace(".", ",");
+  }
+
+  function minutesBetween(dateStr, startStr, endStr){
+    var start = new Date(dateStr + "T" + startStr + ":00");
+    var end = new Date(dateStr + "T" + endStr + ":00");
+    var diff = (end - start) / 60000;
+    if(diff < 0) diff += 24*60; // attraversa la mezzanotte
+    return Math.round(diff);
+  }
+
+  function amountFor(rec){
+    var hours = rec.minutes / 60;
+    var amount = hours * settings.rate;
+    if(rec.car === "mia") amount += settings.bonus;
+    return amount;
+  }
+
+  function toast(msg){
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._h);
+    toast._h = setTimeout(function(){ t.classList.remove("show"); }, 1800);
+  }
+
+  // ---------- stats & rendering ----------
+  function monthOf(dateStr){ return dateStr.slice(0,7); }
+
+  function renderStats(month){
+    var monthRecs = records.filter(function(r){ return monthOf(r.date) === month; });
+    var totalMinutes = 0, totalAmount = 0, paidAmount = 0, dueAmount = 0;
+    monthRecs.forEach(function(r){
+      totalMinutes += r.minutes;
+      var amt = amountFor(r);
+      totalAmount += amt;
+      if(r.payment === "subito") paidAmount += amt; else dueAmount += amt;
+    });
+    var h = Math.floor(totalMinutes/60), m = totalMinutes % 60;
+    document.getElementById("statHours").textContent = h + "h " + pad(m) + "m";
+    document.getElementById("statTotal").textContent = euro(totalAmount);
+    document.getElementById("statPaid").textContent = euro(paidAmount);
+    document.getElementById("statDue").textContent = euro(dueAmount);
+  }
+
+  function carLabel(car){
+    if(car === "scuola") return "Auto autoscuola";
+    if(car === "mia") return "La mia auto";
+    return "Nessuna auto";
+  }
+
+  function renderRecords(month){
+    var list = document.getElementById("recordsList");
+    var monthRecs = records
+      .filter(function(r){ return monthOf(r.date) === month; })
+      .sort(function(a,b){
+        if(a.date !== b.date) return a.date < b.date ? 1 : -1;
+        return a.start < b.start ? 1 : -1;
+      });
+
+    if(monthRecs.length === 0){
+      list.innerHTML = '<div class="empty">Nessuna registrazione per questo mese.</div>';
+      return;
+    }
+
+    list.innerHTML = monthRecs.map(function(r){
+      var amt = amountFor(r);
+      var d = new Date(r.date + "T00:00:00");
+      var dateLabel = pad(d.getDate())+"/"+pad(d.getMonth()+1);
+      var badgeClass = r.payment === "subito" ? "paid" : "due";
+      var badgeLabel = r.payment === "subito" ? "Pagato" : "Da pagare";
+      var payBtn = r.payment === "subito"
+        ? ""
+        : '<button data-act="pay" data-id="'+r.id+'">Segna pagato</button>';
+      return (
+        '<div class="rec">'+
+          '<div class="left">'+
+            '<div class="type">'+r.type+' &middot; '+dateLabel+'</div>'+
+            '<div class="meta">'+sedeLabel(r.sede, r.sedeNota)+'</div>'+
+            '<div class="meta">'+r.start+'&ndash;'+r.end+' &middot; '+carLabel(r.car)+'</div>'+
+          '</div>'+
+          '<div class="right">'+
+            '<div class="amount">'+euro(amt)+'</div>'+
+            '<div class="badge '+badgeClass+'">'+badgeLabel+'</div>'+
+            '<div class="actions">'+payBtn+
+              '<button data-act="del" data-id="'+r.id+'">Elimina</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>'
+      );
+    }).join("");
+  }
+
+  function renderAll(){
+    var month = document.getElementById("monthPicker").value || currentMonthStr();
+    renderStats(month);
+    renderRecords(month);
+  }
+
+  // ---------- month picker ----------
+  var monthPicker = document.getElementById("monthPicker");
+  monthPicker.value = currentMonthStr();
+  monthPicker.addEventListener("change", renderAll);
+
+  // ---------- records list actions ----------
+  document.getElementById("recordsList").addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-act]");
+    if(!btn) return;
+    var id = btn.getAttribute("data-id");
+    var act = btn.getAttribute("data-act");
+    if(act === "del"){
+      if(confirm("Eliminare questa registrazione?")){
+        records = records.filter(function(r){ return r.id !== id; });
+        save(STORE_KEY, records);
+        renderAll();
+        toast("Registrazione eliminata");
+      }
+    } else if(act === "pay"){
+      var rec = records.find(function(r){ return r.id === id; });
+      if(rec){
+        rec.payment = "subito";
+        save(STORE_KEY, records);
+        renderAll();
+        toast("Segnato come pagato");
+      }
+    }
+  });
+
+  // ---------- manual entry form ----------
+  var formPanel = document.getElementById("formPanel");
+  var toggleFormBtn = document.getElementById("toggleFormBtn");
+  var formState = { tipo: "Esame", sede: "molassana", auto: "scuola", pagamento: "subito" };
+  var fSedeNota = document.getElementById("fSedeNota");
+
+  function setSeg(segId, val){
+    var seg = document.getElementById(segId);
+    Array.prototype.forEach.call(seg.querySelectorAll("button"), function(b){
+      b.classList.toggle("sel", b.getAttribute("data-val") === val);
+    });
+  }
+  ["segTipo","segSede","segAuto","segPagamento"].forEach(function(segId){
+    document.getElementById(segId).addEventListener("click", function(e){
+      var b = e.target.closest("button[data-val]");
+      if(!b) return;
+      var val = b.getAttribute("data-val");
+      if(segId === "segTipo") formState.tipo = val;
+      if(segId === "segSede"){
+        formState.sede = val;
+        fSedeNota.style.display = (val === "altro") ? "block" : "none";
+        if(val === "altro") fSedeNota.focus();
+      }
+      if(segId === "segAuto") formState.auto = val;
+      if(segId === "segPagamento") formState.pagamento = val;
+      setSeg(segId, val);
+    });
+  });
+
+  function sedeLabel(sede, nota){
+    if(sede === "molassana") return "Draivo Molassana";
+    if(sede === "europa") return "Draivo Europa";
+    return nota ? nota : "Altra sede";
+  }
+
+  var pendingCalendarId = null;
+
+  function openForm(prefill){
+    prefill = prefill || {};
+    document.getElementById("fDate").value = prefill.date || todayStr();
+    document.getElementById("fStart").value = prefill.start || nowTimeStr();
+    document.getElementById("fEnd").value = prefill.end || nowTimeStr();
+    formState.tipo = prefill.tipo || "Esame";
+    formState.sede = prefill.sede || "molassana";
+    formState.auto = prefill.auto || "scuola";
+    formState.pagamento = prefill.pagamento || "subito";
+    setSeg("segTipo", formState.tipo);
+    setSeg("segSede", formState.sede);
+    setSeg("segAuto", formState.auto);
+    setSeg("segPagamento", formState.pagamento);
+    fSedeNota.value = prefill.sedeNota || "";
+    fSedeNota.style.display = (formState.sede === "altro") ? "block" : "none";
+    document.getElementById("formTitle").textContent = prefill.title || "Nuova registrazione";
+    pendingCalendarId = prefill.calendarId || null;
+    formPanel.classList.add("open");
+    toggleFormBtn.textContent = "－ Nascondi modulo";
+    formPanel.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+  function closeForm(){
+    formPanel.classList.remove("open");
+    toggleFormBtn.textContent = "＋ INSERISCI MANUALMENTE";
+    pendingCalendarId = null;
+  }
+
+  toggleFormBtn.addEventListener("click", function(){
+    if(formPanel.classList.contains("open")) closeForm();
+    else openForm();
+  });
+  document.getElementById("formCancel").addEventListener("click", closeForm);
+
+  document.getElementById("formSave").addEventListener("click", function(){
+    var date = document.getElementById("fDate").value;
+    var start = document.getElementById("fStart").value;
+    var end = document.getElementById("fEnd").value;
+    if(!date || !start || !end){
+      toast("Compila data, inizio e fine");
+      return;
+    }
+    var minutes = minutesBetween(date, start, end);
+    if(minutes <= 0){
+      toast("Controlla gli orari inseriti");
+      return;
+    }
+    records.push({
+      id: uid(),
+      date: date,
+      type: formState.tipo,
+      sede: formState.sede,
+      sedeNota: formState.sede === "altro" ? fSedeNota.value.trim() : "",
+      start: start,
+      end: end,
+      minutes: minutes,
+      car: formState.auto,
+      payment: formState.pagamento
+    });
+    save(STORE_KEY, records);
+    if(pendingCalendarId){
+      calendarItems = calendarItems.filter(function(c){ return c.id !== pendingCalendarId; });
+      save(CALENDAR_KEY, calendarItems);
+      renderCalendar();
+    }
+    monthPicker.value = monthOf(date);
+    closeForm();
+    renderAll();
+    toast("Registrazione salvata");
+  });
+
+  // ---------- calendario ----------
+  var CALENDAR_KEY = "leMieOre.calendar";
+  var calendarItems = load(CALENDAR_KEY, []);
+  var calFormPanel = document.getElementById("calFormPanel");
+  var toggleCalFormBtn = document.getElementById("toggleCalFormBtn");
+  var calSedeNota = document.getElementById("calSedeNota");
+  var calFasciaField = document.getElementById("calFasciaField");
+  var calOrarioField = document.getElementById("calOrarioField");
+  var calFormState = { tipo: "Esame", sede: "molassana", fascia: "mattina" };
+
+  function fasciaLabel(f){ return f === "mattina" ? "Mattina" : "Pomeriggio"; }
+
+  function updateCalTimeFields(){
+    var isEsame = calFormState.tipo === "Esame";
+    calFasciaField.style.display = isEsame ? "block" : "none";
+    calOrarioField.style.display = isEsame ? "none" : "block";
+  }
+
+  document.getElementById("segCalTipo").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-val]");
+    if(!b) return;
+    calFormState.tipo = b.getAttribute("data-val");
+    setSeg("segCalTipo", calFormState.tipo);
+    updateCalTimeFields();
+  });
+  document.getElementById("segCalSede").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-val]");
+    if(!b) return;
+    calFormState.sede = b.getAttribute("data-val");
+    setSeg("segCalSede", calFormState.sede);
+    calSedeNota.style.display = (calFormState.sede === "altro") ? "block" : "none";
+    if(calFormState.sede === "altro") calSedeNota.focus();
+  });
+  document.getElementById("segCalFascia").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-val]");
+    if(!b) return;
+    calFormState.fascia = b.getAttribute("data-val");
+    setSeg("segCalFascia", calFormState.fascia);
+  });
+
+  function openCalForm(){
+    document.getElementById("calDate").value = todayStr();
+    document.getElementById("calOrario").value = nowTimeStr();
+    calFormState = { tipo: "Esame", sede: "molassana", fascia: "mattina" };
+    setSeg("segCalTipo", calFormState.tipo);
+    setSeg("segCalSede", calFormState.sede);
+    setSeg("segCalFascia", calFormState.fascia);
+    calSedeNota.value = "";
+    calSedeNota.style.display = "none";
+    updateCalTimeFields();
+    calFormPanel.classList.add("open");
+    toggleCalFormBtn.textContent = "－ Nascondi modulo";
+    calFormPanel.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+  function closeCalForm(){
+    calFormPanel.classList.remove("open");
+    toggleCalFormBtn.textContent = "＋ AGGIUNGI AL CALENDARIO";
+  }
+  toggleCalFormBtn.addEventListener("click", function(){
+    if(calFormPanel.classList.contains("open")) closeCalForm();
+    else openCalForm();
+  });
+  document.getElementById("calFormCancel").addEventListener("click", closeCalForm);
+
+  document.getElementById("calFormSave").addEventListener("click", function(){
+    var date = document.getElementById("calDate").value;
+    if(!date){ toast("Inserisci una data"); return; }
+    var isEsame = calFormState.tipo === "Esame";
+    var orario = isEsame ? "" : document.getElementById("calOrario").value;
+    if(!isEsame && !orario){ toast("Inserisci l'orario"); return; }
+    calendarItems.push({
+      id: uid(),
+      date: date,
+      type: calFormState.tipo,
+      sede: calFormState.sede,
+      sedeNota: calFormState.sede === "altro" ? calSedeNota.value.trim() : "",
+      fascia: isEsame ? calFormState.fascia : "",
+      orario: orario
+    });
+    save(CALENDAR_KEY, calendarItems);
+    closeCalForm();
+    renderCalendar();
+    toast("Aggiunto al calendario");
+  });
+
+  function renderCalendar(){
+    var list = document.getElementById("calendarList");
+    var items = calendarItems.slice().sort(function(a,b){
+      if(a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return (a.orario||"") < (b.orario||"") ? -1 : 1;
+    });
+    if(items.length === 0){
+      list.innerHTML = '<div class="empty">Nessun appuntamento in programma.</div>';
+      return;
+    }
+    var today = todayStr();
+    list.innerHTML = items.map(function(c){
+      var d = new Date(c.date + "T00:00:00");
+      var dateLabel = pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();
+      var timeLabel = c.type === "Esame" ? fasciaLabel(c.fascia) : c.orario;
+      var pastStyle = c.date < today ? ' style="opacity:.5"' : '';
+      return (
+        '<div class="rec"'+pastStyle+'>'+
+          '<div class="left">'+
+            '<div class="type">'+c.type+' &middot; '+dateLabel+'</div>'+
+            '<div class="meta">'+sedeLabel(c.sede, c.sedeNota)+'</div>'+
+            '<div class="meta">'+timeLabel+'</div>'+
+          '</div>'+
+          '<div class="right">'+
+            '<div class="actions" style="margin-top:0">'+
+              '<button data-act="toRecord" data-id="'+c.id+'">Registra ore</button>'+
+              '<button data-act="delCal" data-id="'+c.id+'">Elimina</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>'
+      );
+    }).join("");
+  }
+
+  document.getElementById("calendarList").addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-act]");
+    if(!btn) return;
+    var id = btn.getAttribute("data-id");
+    var act = btn.getAttribute("data-act");
+    if(act === "delCal"){
+      if(confirm("Eliminare questo appuntamento dal calendario?")){
+        calendarItems = calendarItems.filter(function(c){ return c.id !== id; });
+        save(CALENDAR_KEY, calendarItems);
+        renderCalendar();
+        toast("Appuntamento eliminato");
+      }
+    } else if(act === "toRecord"){
+      var c = calendarItems.find(function(c){ return c.id === id; });
+      if(!c) return;
+      var start = c.type === "Esame" ? (c.fascia === "mattina" ? "09:00" : "14:00") : (c.orario || nowTimeStr());
+      openForm({
+        date: c.date, tipo: c.type, sede: c.sede, sedeNota: c.sedeNota,
+        start: start, end: start,
+        title: "Registra ore svolte", calendarId: c.id
+      });
+    }
+  });
+
+  // ---------- timer ----------
+  var timerBtn = document.getElementById("timerBtn");
+  var timerDisplay = document.getElementById("timerDisplay");
+  var timerStatus = document.getElementById("timerStatus");
+  var timerInterval = null;
+
+  function fmtElapsed(ms){
+    var s = Math.floor(ms/1000);
+    var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+    return pad(h)+":"+pad(m)+":"+pad(sec);
+  }
+
+  function tickTimer(){
+    if(!timer) return;
+    var elapsed = Date.now() - new Date(timer.startISO).getTime();
+    timerDisplay.textContent = fmtElapsed(elapsed);
+  }
+
+  function renderTimerUI(){
+    if(timer){
+      timerStatus.textContent = "Lavoro in corso";
+      timerDisplay.classList.remove("idle");
+      timerBtn.textContent = "⏹️ TERMINA LAVORO";
+      timerBtn.classList.remove("start");
+      timerBtn.classList.add("stop");
+      tickTimer();
+      if(!timerInterval) timerInterval = setInterval(tickTimer, 1000);
+    } else {
+      timerStatus.textContent = "Nessun lavoro in corso";
+      timerDisplay.classList.add("idle");
+      timerDisplay.textContent = "00:00:00";
+      timerBtn.textContent = "▶️ INIZIA LAVORO";
+      timerBtn.classList.remove("stop");
+      timerBtn.classList.add("start");
+      if(timerInterval){ clearInterval(timerInterval); timerInterval = null; }
+    }
+  }
+
+  timerBtn.addEventListener("click", function(){
+    if(!timer){
+      timer = { startISO: new Date().toISOString() };
+      save(TIMER_KEY, timer);
+      renderTimerUI();
+      toast("Lavoro avviato");
+    } else {
+      var startDate = new Date(timer.startISO);
+      var date = startDate.getFullYear()+"-"+pad(startDate.getMonth()+1)+"-"+pad(startDate.getDate());
+      var start = pad(startDate.getHours())+":"+pad(startDate.getMinutes());
+      var end = nowTimeStr();
+      timer = null;
+      localStorage.removeItem(TIMER_KEY);
+      renderTimerUI();
+      openForm({ date: date, start: start, end: end, title: "Termina registrazione" });
+      toast("Lavoro terminato, completa i dettagli");
+    }
+  });
+
+  // ---------- settings ----------
+  var settingsPanel = document.getElementById("settingsPanel");
+  var rateInput = document.getElementById("rateInput");
+  var bonusInput = document.getElementById("bonusInput");
+
+  document.getElementById("gearBtn").addEventListener("click", function(){
+    rateInput.value = settings.rate;
+    bonusInput.value = settings.bonus;
+    settingsPanel.classList.toggle("open");
+  });
+  document.getElementById("settingsClose").addEventListener("click", function(){
+    settingsPanel.classList.remove("open");
+  });
+  document.getElementById("settingsSave").addEventListener("click", function(){
+    var rate = parseFloat(rateInput.value);
+    var bonus = parseFloat(bonusInput.value);
+    settings.rate = isNaN(rate) ? settings.rate : rate;
+    settings.bonus = isNaN(bonus) ? settings.bonus : bonus;
+    save(SETTINGS_KEY, settings);
+    settingsPanel.classList.remove("open");
+    renderAll();
+    toast("Impostazioni salvate");
+  });
+
+  // ---------- backup ----------
+  document.getElementById("exportBtn").addEventListener("click", function(){
+    var data = { records: records, settings: settings, exportedAt: new Date().toISOString() };
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var d = new Date();
+    a.href = url;
+    a.download = "le-mie-ore-backup-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("Backup esportato");
+  });
+
+  var importFile = document.getElementById("importFile");
+  document.getElementById("importBtn").addEventListener("click", function(){
+    importFile.click();
+  });
+  importFile.addEventListener("change", function(){
+    var file = importFile.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var data = JSON.parse(reader.result);
+        if(!data || !Array.isArray(data.records)) throw new Error("formato non valido");
+        if(!confirm("Importare il backup? I dati attuali sul dispositivo verranno sostituiti.")) return;
+        records = data.records;
+        settings = Object.assign({}, defaultSettings, data.settings || {});
+        save(STORE_KEY, records);
+        save(SETTINGS_KEY, settings);
+        renderAll();
+        toast("Backup importato");
+      }catch(err){
+        alert("File di backup non valido.");
+      }
+      importFile.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- init ----------
+  renderTimerUI();
+  renderAll();
+  renderCalendar();
+
+  if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>
