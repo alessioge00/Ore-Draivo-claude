@@ -166,6 +166,54 @@
   }
   .empty{padding:26px 14px; text-align:center; color:var(--muted); font-size:14px;}
 
+  /* ---- calendario a griglia ---- */
+  .cal-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:14px; margin-bottom:16px;
+  }
+  .cal-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .cal-nav button{
+    width:36px; height:36px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--text); font-size:18px; line-height:1; cursor:pointer;
+  }
+  .cal-nav button:active{background:var(--line);}
+  .cal-month-label{font-size:15px; font-weight:700; color:var(--text); text-transform:capitalize;}
+  .cal-weekdays{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px;
+  }
+  .cal-weekdays span{
+    text-align:center; font-size:11px; color:var(--muted); font-weight:700; text-transform:uppercase;
+  }
+  .cal-grid{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:4px;
+  }
+  .cal-cell{
+    aspect-ratio:1; background:var(--surface-2); border:1px solid transparent; color:var(--text); border-radius:8px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; gap:3px; position:relative;
+  }
+  .cal-cell.empty-cell{visibility:hidden; cursor:default; background:none;}
+  .cal-cell:active{background:var(--line);}
+  .cal-cell.today{border:1px solid var(--accent); color:var(--accent);}
+  .cal-cell.selected{background:var(--accent); border-color:var(--accent); color:#0d1512; font-weight:700;}
+  .cal-cell .dot{width:5px; height:5px; border-radius:50%; background:var(--gold);}
+  .cal-cell.selected .dot{background:#0d1512;}
+  .cal-cell.past{color:var(--muted); font-weight:500;}
+
+  .day-detail{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:14px; margin-bottom:0; display:none;
+  }
+  .day-detail.open{display:block;}
+  .day-detail-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .day-detail-title{font-size:14.5px; font-weight:650; text-transform:capitalize;}
+  .day-detail-header button{
+    background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:4px;
+  }
+  .day-detail .rec{background:var(--surface-2); border-radius:8px; margin-bottom:8px; border-bottom:none;}
+  .day-detail .rec:last-of-type{margin-bottom:12px;}
+  .day-detail .empty{padding:14px 4px; font-size:13.5px;}
+
   /* ---- Settings / backup ---- */
   .section{margin-bottom:22px;}
   .section h2{
@@ -349,7 +397,26 @@
       </div>
     </div>
 
-    <div class="records" id="calendarList"></div>
+    <div class="cal-card" style="background:#1b212b; border:1px solid #2b3340; border-radius:10px; padding:14px; margin-bottom:16px;">
+      <div class="cal-nav">
+        <button type="button" id="calPrevBtn" aria-label="Mese precedente">‹</button>
+        <div class="cal-month-label" id="calMonthLabel">—</div>
+        <button type="button" id="calNextBtn" aria-label="Mese successivo">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <div class="day-detail" id="dayDetail">
+      <div class="day-detail-header">
+        <div class="day-detail-title" id="dayDetailTitle">—</div>
+        <button type="button" id="dayDetailClose" aria-label="Chiudi">✕</button>
+      </div>
+      <div id="dayDetailList"></div>
+      <button class="link-btn" id="dayDetailAddBtn" style="margin-top:2px">＋ Aggiungi per questo giorno</button>
+    </div>
   </div>
 
   <div class="section">
@@ -366,6 +433,11 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Sincronizzazione calendario (facoltativa): se firebase-config.js non è configurato,
+     l'app funziona comunque solo in locale. Vedi README per l'attivazione. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script>
 (function(){
   "use strict";
@@ -634,9 +706,7 @@
     });
     save(STORE_KEY, records);
     if(pendingCalendarId){
-      calendarItems = calendarItems.filter(function(c){ return c.id !== pendingCalendarId; });
-      save(CALENDAR_KEY, calendarItems);
-      renderCalendar();
+      removeCalendarItem(pendingCalendarId);
     }
     monthPicker.value = monthOf(date);
     closeForm();
@@ -644,9 +714,56 @@
     toast("Registrazione salvata");
   });
 
+  // ---------- sincronizzazione (facoltativa, Firebase) ----------
+  var firebaseReady = false;
+  var calendarRef = null;
+  try{
+    if(typeof firebase !== "undefined" && window.FIREBASE_CONFIG &&
+       window.FIREBASE_CONFIG.apiKey && window.FIREBASE_CONFIG.apiKey.indexOf("INCOLLA") === -1){
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+      calendarRef = firebase.database().ref("calendario");
+      firebaseReady = true;
+    }
+  }catch(e){ firebaseReady = false; }
+
   // ---------- calendario ----------
   var CALENDAR_KEY = "leMieOre.calendar";
   var calendarItems = load(CALENDAR_KEY, []);
+
+  function addCalendarItem(item){
+    if(firebaseReady){
+      calendarRef.child(item.id).set({
+        date: item.date, type: item.type, sede: item.sede, sedeNota: item.sedeNota,
+        fascia: item.fascia, orario: item.orario
+      }).catch(function(){ toast("Salvato solo in locale (rete non disponibile)"); });
+    } else {
+      calendarItems.push(item);
+      save(CALENDAR_KEY, calendarItems);
+      renderCalendar();
+    }
+  }
+  function removeCalendarItem(id){
+    if(firebaseReady){
+      calendarRef.child(id).remove().catch(function(){ toast("Rimozione non riuscita (rete non disponibile)"); });
+    } else {
+      calendarItems = calendarItems.filter(function(c){ return c.id !== id; });
+      save(CALENDAR_KEY, calendarItems);
+      renderCalendar();
+    }
+  }
+  function attachCalendarSync(){
+    if(!firebaseReady) return;
+    calendarRef.on("value", function(snapshot){
+      var val = snapshot.val() || {};
+      calendarItems = Object.keys(val).map(function(id){
+        var it = val[id];
+        it.id = id;
+        return it;
+      });
+      save(CALENDAR_KEY, calendarItems);
+      renderCalendar();
+    });
+  }
   var calFormPanel = document.getElementById("calFormPanel");
   var toggleCalFormBtn = document.getElementById("toggleCalFormBtn");
   var calSedeNota = document.getElementById("calSedeNota");
@@ -684,8 +801,8 @@
     setSeg("segCalFascia", calFormState.fascia);
   });
 
-  function openCalForm(){
-    document.getElementById("calDate").value = todayStr();
+  function openCalForm(dateOverride){
+    document.getElementById("calDate").value = dateOverride || todayStr();
     document.getElementById("calOrario").value = nowTimeStr();
     calFormState = { tipo: "Esame", sede: "molassana", fascia: "mattina" };
     setSeg("segCalTipo", calFormState.tipo);
@@ -714,7 +831,7 @@
     var isEsame = calFormState.tipo === "Esame";
     var orario = isEsame ? "" : document.getElementById("calOrario").value;
     if(!isEsame && !orario){ toast("Inserisci l'orario"); return; }
-    calendarItems.push({
+    addCalendarItem({
       id: uid(),
       date: date,
       type: calFormState.tipo,
@@ -723,34 +840,83 @@
       fascia: isEsame ? calFormState.fascia : "",
       orario: orario
     });
-    save(CALENDAR_KEY, calendarItems);
     closeCalForm();
-    renderCalendar();
     toast("Aggiunto al calendario");
   });
 
-  function renderCalendar(){
-    var list = document.getElementById("calendarList");
-    var items = calendarItems.slice().sort(function(a,b){
-      if(a.date !== b.date) return a.date < b.date ? -1 : 1;
-      return (a.orario||"") < (b.orario||"") ? -1 : 1;
-    });
-    if(items.length === 0){
-      list.innerHTML = '<div class="empty">Nessun appuntamento in programma.</div>';
+  var MESI = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+  var GIORNI_LUNGHI = ["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"];
+  var calViewYear, calViewMonth, selectedDay = null;
+  (function initCalView(){
+    var now = new Date();
+    calViewYear = now.getFullYear();
+    calViewMonth = now.getMonth();
+  })();
+
+  function eventsOn(dateStr){
+    return calendarItems.filter(function(c){ return c.date === dateStr; });
+  }
+
+  function renderCalendarGrid(){
+    document.getElementById("calMonthLabel").textContent = MESI[calViewMonth] + " " + calViewYear;
+    var firstOfMonth = new Date(calViewYear, calViewMonth, 1);
+    var daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+    var startOffset = (firstOfMonth.getDay() + 6) % 7; // lunedì come primo giorno
+    var today = todayStr();
+    var html = "";
+    for(var i = 0; i < startOffset; i++){
+      html += '<div class="cal-cell empty-cell"></div>';
+    }
+    for(var day = 1; day <= daysInMonth; day++){
+      var dateStr = calViewYear + "-" + pad(calViewMonth+1) + "-" + pad(day);
+      var has = eventsOn(dateStr).length > 0;
+      var isToday = dateStr === today;
+      var isSelected = dateStr === selectedDay;
+      var isPast = dateStr < today;
+      var cls = "cal-cell";
+      if(isToday) cls += " today";
+      if(isSelected) cls += " selected";
+      if(isPast) cls += " past";
+
+      var bg = isSelected ? "#4fb3a5" : "#232a35";
+      var fg = isSelected ? "#0d1512" : (isToday ? "#4fb3a5" : (isPast ? "#8b93a1" : "#e9ecf1"));
+      var borderCol = isToday ? "#4fb3a5" : "transparent";
+      var dotCol = isSelected ? "#0d1512" : "#e0a94f";
+      var cellStyle = "background:"+bg+"; color:"+fg+"; border:1px solid "+borderCol+"; border-radius:8px;"+
+        " height:38px; display:flex; flex-direction:column; align-items:center; justify-content:center;"+
+        " font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; gap:3px; position:relative;";
+      var dotStyle = "width:5px; height:5px; border-radius:50%; background:"+dotCol+(has ? "" : "; visibility:hidden");
+
+      html += '<button type="button" class="'+cls+'" data-date="'+dateStr+'" style="'+cellStyle+'">'+day+
+                '<span class="dot" style="'+dotStyle+'"></span>'+
+              '</button>';
+    }
+    document.getElementById("calGrid").innerHTML = html;
+  }
+
+  function renderDayDetail(){
+    var panel = document.getElementById("dayDetail");
+    if(!selectedDay){
+      panel.classList.remove("open");
       return;
     }
-    var today = todayStr();
+    panel.classList.add("open");
+    var d = new Date(selectedDay + "T00:00:00");
+    document.getElementById("dayDetailTitle").textContent =
+      GIORNI_LUNGHI[d.getDay()] + " " + pad(d.getDate()) + " " + MESI[d.getMonth()];
+    var items = eventsOn(selectedDay).sort(function(a,b){ return (a.orario||"") < (b.orario||"") ? -1 : 1; });
+    var list = document.getElementById("dayDetailList");
+    if(items.length === 0){
+      list.innerHTML = '<div class="empty">Nessun appuntamento in questo giorno.</div>';
+      return;
+    }
     list.innerHTML = items.map(function(c){
-      var d = new Date(c.date + "T00:00:00");
-      var dateLabel = pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();
       var timeLabel = c.type === "Esame" ? fasciaLabel(c.fascia) : c.orario;
-      var pastStyle = c.date < today ? ' style="opacity:.5"' : '';
       return (
-        '<div class="rec"'+pastStyle+'>'+
+        '<div class="rec">'+
           '<div class="left">'+
-            '<div class="type">'+c.type+' &middot; '+dateLabel+'</div>'+
-            '<div class="meta">'+sedeLabel(c.sede, c.sedeNota)+'</div>'+
-            '<div class="meta">'+timeLabel+'</div>'+
+            '<div class="type">'+c.type+'</div>'+
+            '<div class="meta">'+sedeLabel(c.sede, c.sedeNota)+' &middot; '+timeLabel+'</div>'+
           '</div>'+
           '<div class="right">'+
             '<div class="actions" style="margin-top:0">'+
@@ -763,16 +929,47 @@
     }).join("");
   }
 
-  document.getElementById("calendarList").addEventListener("click", function(e){
+  function renderCalendar(){
+    renderCalendarGrid();
+    renderDayDetail();
+  }
+
+  document.getElementById("calGrid").addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-date]");
+    if(!btn) return;
+    var dateStr = btn.getAttribute("data-date");
+    selectedDay = (selectedDay === dateStr) ? null : dateStr;
+    renderCalendarGrid();
+    renderDayDetail();
+    if(selectedDay) document.getElementById("dayDetail").scrollIntoView({behavior:"smooth", block:"nearest"});
+  });
+  document.getElementById("calPrevBtn").addEventListener("click", function(){
+    calViewMonth--;
+    if(calViewMonth < 0){ calViewMonth = 11; calViewYear--; }
+    renderCalendarGrid();
+  });
+  document.getElementById("calNextBtn").addEventListener("click", function(){
+    calViewMonth++;
+    if(calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
+    renderCalendarGrid();
+  });
+  document.getElementById("dayDetailClose").addEventListener("click", function(){
+    selectedDay = null;
+    renderCalendarGrid();
+    renderDayDetail();
+  });
+  document.getElementById("dayDetailAddBtn").addEventListener("click", function(){
+    if(selectedDay) openCalForm(selectedDay);
+  });
+
+  document.getElementById("dayDetailList").addEventListener("click", function(e){
     var btn = e.target.closest("button[data-act]");
     if(!btn) return;
     var id = btn.getAttribute("data-id");
     var act = btn.getAttribute("data-act");
     if(act === "delCal"){
       if(confirm("Eliminare questo appuntamento dal calendario?")){
-        calendarItems = calendarItems.filter(function(c){ return c.id !== id; });
-        save(CALENDAR_KEY, calendarItems);
-        renderCalendar();
+        removeCalendarItem(id);
         toast("Appuntamento eliminato");
       }
     } else if(act === "toRecord"){
@@ -915,6 +1112,7 @@
   renderTimerUI();
   renderAll();
   renderCalendar();
+  attachCalendarSync();
 
   if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
     navigator.serviceWorker.register("sw.js").catch(function(){});
