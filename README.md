@@ -12,6 +12,9 @@ App web per registrare ore di lavoro, calcolare il compenso maturato e tenere tr
    - `icon-192.png`
    - `icon-512.png`
    - `apple-touch-icon.png`
+   - `calendario-condiviso.html`
+   - `manifest-condiviso.json`
+   - `firebase-config.js`
 3. Vai su **Settings → Pages**, scegli come sorgente il branch `main` e cartella `/ (root)`.
 4. Dopo qualche minuto l'app sarà raggiungibile su `https://<tuo-utente>.github.io/le-mie-ore/`.
 
@@ -33,6 +36,33 @@ Tutti i dati (registrazioni, tariffa oraria, bonus auto) restano solo sul tuo iP
 
 Conviene esportare un backup ogni tanto (es. inviandolo a te stesso via Mail/AirDrop) e prima di ogni cambio dispositivo.
 
+## Condividere il calendario con un'altra persona
+
+Il calendario (gli appuntamenti che inserisci in anticipo) può essere sincronizzato online, così una pagina di sola lettura si aggiorna da sola ogni volta che aggiungi o togli qualcosa. **Le ore lavorate e i guadagni restano sempre solo sul tuo telefono**: non vengono mai sincronizzati, solo il calendario.
+
+**1. Crea un progetto Firebase gratuito** (5 minuti, serve solo un account Google):
+1. Vai su [console.firebase.google.com](https://console.firebase.google.com) → **Crea un progetto** (puoi disattivare Google Analytics, non serve).
+2. Nella pagina del progetto clicca l'icona **`</>`** ("aggiungi app web"), dai un nome qualsiasi e registra l'app. Ti mostrerà un blocco `firebaseConfig = { ... }`: tienilo a portata di mano.
+3. Nel menu a sinistra vai su **Realtime Database** (non "Firestore Database") → **Crea database** → scegli una zona europea → avvia in **modalità test**.
+4. Nella scheda **Regole** del Realtime Database sostituisci il contenuto con questo e clicca **Pubblica**:
+   ```json
+   {
+     "rules": {
+       "calendario": {
+         ".read": true,
+         ".write": true
+       }
+     }
+   }
+   ```
+   Questo lascia leggibile/scrivibile solo il calendario, a chiunque abbia il link della tua app — nessun altro dato è esposto. Non è protetto da password: va bene per un uso familiare, ma non condividere il link pubblicamente.
+
+**2. Incolla la configurazione**: apri `firebase-config.js` e sostituisci i valori segnaposto con quelli del blocco `firebaseConfig` copiato al passo 1. Carica il file aggiornato su GitHub.
+
+**3. Condividi con tua moglie**: dopo aver aggiornato GitHub Pages, mandale il link `https://<tuo-utente>.github.io/le-mie-ore/calendario-condiviso.html`. È una pagina di sola lettura (non può modificare nulla) che si aggiorna da sola in tempo reale — può anche aggiungerla alla Home del suo iPhone come le hai fatto tu.
+
+Finché `firebase-config.js` resta con i valori segnaposto, l'app continua a funzionare normalmente ma solo in locale, come prima. Nota anche che gli appuntamenti aggiunti al calendario *prima* di completare questa configurazione non vengono importati automaticamente nella sincronizzazione: conviene attivarla prima di iniziare a usare il calendario, oppure reinserirli dopo.
+
 ## Funzionalità principali
 
 - **Registrazione ore**: timer avvia/ferma, oppure inserimento manuale con data, tipo, sede, auto usata e stato del pagamento.
@@ -41,5 +71,14 @@ Conviene esportare un backup ogni tanto (es. inviandolo a te stesso via Mail/Air
 
 ## Personalizzazione
 
-- **Tariffa oraria** (default 10 €/h) e **bonus per uso dell'auto propria**: modificabili dall'icona ⚙ in alto a destra.
+- **Tariffa oraria** (default 10 €/h), **rimborso auto propria** e **ore previste di default per tipo** (usate dal calendario): modificabili dall'icona ⚙ in alto a destra.
 - Le categorie di lavoro (Esame, Simulatore, Commissione, Altro) e le sedi sono fisse nel codice: si possono cambiare modificando i pulsanti dentro `<div class="seg" id="segTipo">` / `id="segSede"` in `index.html`.
+
+## Novità della versione 2
+
+- **Simulatore**: mostra solo la sede Draivo Europa e non chiede l'auto.
+- **Altro**: campo nota per annotare cosa è stato fatto (anche nel calendario).
+- **Rimborsi**: separati dal guadagno. Contengono il rimborso per l'auto propria e, a piacere, spese inserite a mano con una descrizione. Hanno una casella dedicata tra le statistiche e non entrano in Totale maturato / Incassato / Da incassare.
+- **Previsione nel calendario**: ogni impegno ha le ore previste; la sezione calendario mostra impegni, ore e guadagno *ipotetico* del mese, separato dal totale maturato. Quando confermi le ore con "Registra ore", l'impegno esce dalla previsione ed entra nel maturato. Un pallino rosso indica un impegno già passato ancora da confermare.
+- Il backup ora include anche il calendario.
+- **Aggiornamento**: per installare la v2 sostituisci `index.html`, `calendario-condiviso.html` e `sw.js` su GitHub. **Non sovrascrivere `firebase-config.js`**: contiene la tua configurazione.

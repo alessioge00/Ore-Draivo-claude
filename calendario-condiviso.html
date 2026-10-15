@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>I miei orari</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="I miei orari">
+<meta name="theme-color" content="#12161d">
+<link rel="manifest" href="manifest-condiviso.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#12161d; --surface:#1b212b; --surface-2:#232a35; --line:#2b3340;
+    --text:#e9ecf1; --muted:#8b93a1; --accent:#4fb3a5; --gold:#e0a94f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text); min-height:100vh;}
+  body{font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; padding-bottom:40px;}
+  .wrap{max-width:520px; margin:0 auto; padding:0 16px;}
+
+  header.top{
+    padding:calc(env(safe-area-inset-top, 0px) + 22px) 0 16px;
+    background:var(--surface); border-bottom:1px solid var(--line); margin-bottom:20px;
+  }
+  header.top .inner{max-width:520px; margin:0 auto; padding:0 16px;}
+  header.top h1{
+    font-size:20px; font-weight:700; letter-spacing:-0.01em; margin:0 0 4px;
+    display:flex; align-items:center; gap:8px;
+  }
+  header.top h1 .dot{
+    width:9px; height:9px; border-radius:50%; background:var(--accent);
+    box-shadow:0 0 0 3px rgba(79,179,165,0.18);
+  }
+  header.top .sub{font-size:13px; color:var(--muted); margin:0;}
+
+  .month-row{
+    font-size:14px; font-weight:650; color:var(--text);
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    padding:9px 12px; display:inline-block; margin-bottom:10px;
+  }
+
+  .records{background:var(--surface); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:18px;}
+  .rec{padding:13px 14px; border-bottom:1px solid var(--line);}
+  .rec:last-child{border-bottom:none;}
+  .rec .type{font-size:15px; font-weight:650;}
+  .rec .meta{font-size:13px; color:var(--muted); margin-top:3px;}
+  .empty{padding:28px 14px; text-align:center; color:var(--muted); font-size:14px;}
+
+  .status{
+    display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--muted);
+    margin:0 0 18px; padding:0 2px;
+  }
+  .status .pulse{
+    width:7px; height:7px; border-radius:50%; background:var(--accent); flex-shrink:0;
+  }
+  .setup-msg{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:16px; font-size:14px; color:var(--muted); line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <h1><span class="dot"></span>I miei orari</h1>
+    <p class="sub">Calendario condiviso — sola lettura</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="statusRow">
+    <span class="pulse"></span><span id="statusText">Connessione in corso…</span>
+  </div>
+
+  <div id="content">
+    <div class="empty">Caricamento…</div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  function pad(n){ return n < 10 ? "0"+n : ""+n; }
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(ch){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch];
+    });
+  }
+  function fasciaLabel(f){ return f === "mattina" ? "Mattina" : "Pomeriggio"; }
+  function sedeLabel(sede, nota){
+    if(sede === "molassana") return "Draivo Molassana";
+    if(sede === "europa") return "Draivo Europa";
+    return nota ? nota : "Altra sede";
+  }
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  }
+
+  var content = document.getElementById("content");
+  var statusText = document.getElementById("statusText");
+
+  function render(items){
+    if(!items || items.length === 0){
+      content.innerHTML = '<div class="records"><div class="empty">Nessun appuntamento in programma.</div></div>';
+      return;
+    }
+    var today = todayStr();
+    items = items.slice().sort(function(a,b){
+      if(a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return (a.orario||"") < (b.orario||"") ? -1 : 1;
+    });
+    var html = items.map(function(c){
+      var d = new Date(c.date + "T00:00:00");
+      var giorni = ["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"];
+      var dateLabel = giorni[d.getDay()]+" "+pad(d.getDate())+"/"+pad(d.getMonth()+1);
+      var timeLabel = c.type === "Esame" ? fasciaLabel(c.fascia) : c.orario;
+      var pastStyle = c.date < today ? ' style="opacity:.45"' : '';
+      return (
+        '<div class="rec"'+pastStyle+'>'+
+          '<div class="type">'+esc(c.type)+' &middot; '+dateLabel+'</div>'+
+          '<div class="meta">'+esc(sedeLabel(c.sede, c.sedeNota))+' &middot; '+esc(timeLabel)+'</div>'+
+          (c.note ? '<div class="meta" style="color:#e9ecf1;opacity:.85">'+esc(c.note)+'</div>' : '')+
+        '</div>'
+      );
+    }).join("");
+    content.innerHTML = '<div class="records">'+html+'</div>';
+  }
+
+  try{
+    if(typeof firebase === "undefined" || !window.FIREBASE_CONFIG ||
+       !window.FIREBASE_CONFIG.apiKey || window.FIREBASE_CONFIG.apiKey.indexOf("INCOLLA") !== -1){
+      throw new Error("not configured");
+    }
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    var ref = firebase.database().ref("calendario");
+    ref.on("value", function(snapshot){
+      var val = snapshot.val() || {};
+      var items = Object.keys(val).map(function(id){ var it = val[id]; it.id = id; return it; });
+      render(items);
+      var now = new Date();
+      statusText.textContent = "Aggiornato alle " + pad(now.getHours())+":"+pad(now.getMinutes())+":"+pad(now.getSeconds());
+    }, function(){
+      statusText.textContent = "Connessione non riuscita";
+    });
+  }catch(e){
+    document.getElementById("statusRow").style.display = "none";
+    content.innerHTML = '<div class="setup-msg">La sincronizzazione non è ancora attiva. Chi gestisce l\'app deve completare la configurazione in <code>firebase-config.js</code>.</div>';
+  }
+})();
+</script>
+</body>
+</html>
