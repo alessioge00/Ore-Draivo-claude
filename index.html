@@ -130,6 +130,12 @@
   .seg button.sel{background:var(--accent); color:#0d1512; font-weight:600;}
   .seg.seg-sede button{font-size:12px; line-height:1.25; padding:9px 4px; white-space:normal;}
   .field .note-input{margin-top:8px;}
+  .field textarea{
+    width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); font-family:ui-monospace, Menlo, monospace; font-size:12.5px;
+    padding:10px; resize:vertical; min-height:120px;
+  }
+  .field textarea:focus{outline:2px solid var(--accent); outline-offset:0;}
   .form-actions{display:flex; gap:10px; margin-top:4px;}
   .form-actions button{flex:1; padding:12px; border-radius:8px; border:none; font-size:15px; font-weight:600; cursor:pointer;}
   .btn-save{background:var(--accent); color:#0d1512;}
@@ -438,7 +444,20 @@
 
   <div class="section">
     <div class="month-row" style="margin-bottom:10px"><h2>Calendario</h2></div>
-    <button class="link-btn" id="toggleCalFormBtn">＋ AGGIUNGI AL CALENDARIO</button>
+    <button class="link-btn" id="toggleCalFormBtn" style="margin-bottom:10px">＋ AGGIUNGI AL CALENDARIO</button>
+    <button class="link-btn" id="toggleCalImportBtn">⇩ IMPORTA IMPEGNI</button>
+
+    <div class="form-panel" id="calImportPanel">
+      <h2>Importa impegni</h2>
+      <div class="field">
+        <label for="calImportText">Incolla qui il blocco preparato da Claude</label>
+        <textarea id="calImportText" rows="8" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" placeholder='[{"date":"2026-10-27","type":"Esame","sede":"molassana","fascia":"mattina"}]'></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn-cancel" id="calImportCancel">Annulla</button>
+        <button class="btn-save" id="calImportSave">Importa</button>
+      </div>
+    </div>
 
     <div class="form-panel" id="calFormPanel">
       <h2>Nuovo appuntamento</h2>
@@ -1043,6 +1062,86 @@
     });
     closeCalForm();
     toast("Aggiunto al calendario");
+  });
+
+  // ---------- importazione impegni (testo incollato) ----------
+  var calImportPanel = $("calImportPanel");
+  var toggleCalImportBtn = $("toggleCalImportBtn");
+  function closeCalImport(){
+    calImportPanel.classList.remove("open");
+    toggleCalImportBtn.textContent = "⇩ IMPORTA IMPEGNI";
+  }
+  toggleCalImportBtn.addEventListener("click", function(){
+    if(calImportPanel.classList.contains("open")){ closeCalImport(); return; }
+    $("calImportText").value = "";
+    calImportPanel.classList.add("open");
+    toggleCalImportBtn.textContent = "－ Nascondi importazione";
+    calImportPanel.scrollIntoView({behavior:"smooth", block:"nearest"});
+  });
+  $("calImportCancel").addEventListener("click", closeCalImport);
+
+  function calKey(c){
+    return [c.date, c.type, c.sede, (c.sedeNota||"").toLowerCase(), c.fascia||"", c.orario||"", (c.note||"").toLowerCase()].join("|");
+  }
+  function normalizeImported(raw){
+    if(!raw || typeof raw !== "object") return null;
+    var date = String(raw.date || "").trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    var types = ["Esame","Simulatore","Commissione","Altro"];
+    var type = types.indexOf(raw.type) !== -1 ? raw.type : null;
+    if(!type) return null;
+    var sede = (type === "Simulatore") ? "europa" : String(raw.sede || "molassana");
+    if(["molassana","europa","altro"].indexOf(sede) === -1) sede = "altro";
+    var item = {
+      id: uid(), date: date, type: type, sede: sede,
+      sedeNota: sede === "altro" ? String(raw.sedeNota || "").trim() : "",
+      fascia: "", orario: "", note: "", hours: 0
+    };
+    if(type === "Esame"){
+      item.fascia = raw.fascia === "pomeriggio" ? "pomeriggio" : "mattina";
+    } else {
+      var orario = String(raw.orario || "").trim();
+      if(!/^\d{2}:\d{2}$/.test(orario)) return null;
+      item.orario = orario;
+    }
+    if(type === "Altro") item.note = String(raw.note || "").trim().slice(0,200);
+    var h = parseFloat(raw.hours);
+    item.hours = (!isNaN(h) && h > 0) ? h : hoursFor(type);
+    return item;
+  }
+  $("calImportSave").addEventListener("click", function(){
+    var txt = $("calImportText").value.trim();
+    if(!txt){ toast("Incolla prima il blocco"); return; }
+    var arr;
+    try{ arr = JSON.parse(txt); }catch(e){ alert("Testo non valido: copia tutto il blocco, dalla prima [ all'ultima ]."); return; }
+    if(!Array.isArray(arr)){ alert("Formato non valido: serve un elenco di impegni."); return; }
+    var seen = {};
+    calendarItems.forEach(function(c){ seen[calKey(c)] = true; });
+    var toAdd = [], dup = 0, bad = 0;
+    arr.forEach(function(raw){
+      var it = normalizeImported(raw);
+      if(!it){ bad++; return; }
+      var k = calKey(it);
+      if(seen[k]){ dup++; return; }
+      seen[k] = true;
+      toAdd.push(it);
+    });
+    if(!toAdd.length){
+      toast(dup ? "Già tutti presenti (" + dup + ")" : "Nessun impegno valido");
+      return;
+    }
+    if(firebaseReady){
+      var obj = {};
+      toAdd.forEach(function(it){ obj[it.id] = calPayload(it); });
+      calendarRef.update(obj)
+        .catch(function(){ toast("Importazione non riuscita (rete non disponibile)"); });
+    } else {
+      toAdd.forEach(function(it){ calendarItems.push(it); });
+      save(CALENDAR_KEY, calendarItems);
+      renderCalendar();
+    }
+    closeCalImport();
+    toast("Importati " + toAdd.length + (dup ? ", già presenti " + dup : "") + (bad ? ", scartati " + bad : ""));
   });
 
   // griglia mensile
