@@ -323,7 +323,7 @@
 
 <header class="top">
   <div class="inner">
-    <h1><span class="dot"></span>Le mie ore <span class="ver">v2</span></h1>
+    <h1><span class="dot"></span>Le mie ore <span class="ver">v2.1.1</span></h1>
     <button class="gear" id="gearBtn" aria-label="Impostazioni">⚙</button>
   </div>
 </header>
@@ -1112,8 +1112,15 @@
   });
   $("calImportCancel").addEventListener("click", closeCalImport);
 
+  // Chiave anti-doppioni: un solo Esame per giorno e fascia; per gli altri tipi giorno + tipo + orario
   function calKey(c){
-    return [c.date, c.type, c.sede, (c.sedeNota||"").toLowerCase(), c.fascia||"", c.orario||"", (c.note||"").toLowerCase()].join("|");
+    if(c.type === "Esame") return [c.date, "Esame", c.fascia || ""].join("|");
+    return [c.date, c.type, c.orario || "", c.type === "Altro" ? (c.note || "").toLowerCase() : ""].join("|");
+  }
+  function hashStr(str){
+    var h = 5381;
+    for(var i = 0; i < str.length; i++){ h = ((h << 5) + h + str.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(36);
   }
   function normalizeImported(raw){
     if(!raw || typeof raw !== "object") return null;
@@ -1137,6 +1144,8 @@
       item.orario = orario;
     }
     if(type === "Altro") item.note = String(raw.note || "").trim().slice(0,200);
+    // id fisso: importare due volte lo stesso impegno scrive sempre sulla stessa voce
+    item.id = "imp-" + date.replace(/-/g, "") + "-" + hashStr(calKey(item));
     var h = parseFloat(raw.hours);
     item.hours = (!isNaN(h) && h > 0) ? h : hoursFor(type);
     return item;
@@ -1538,6 +1547,32 @@
   var lastTab = "ore";
   try{ lastTab = localStorage.getItem(TAB_KEY) || "ore"; }catch(e){}
   showTab(lastTab);
+
+  // ---------- aggiornamento automatico ----------
+  // Va cambiato a ogni nuova versione dell'app: se online c'è un numero diverso, l'app si ricarica.
+  var APP_VERSION = "2.1.1";
+  var versionRe = new RegExp("APP_VERSION\\s*=\\s*\"([^\"]+)\"");
+  function checkForUpdate(){
+    if(!navigator.onLine) return;
+    fetch(location.pathname, { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(t){
+        if(!t) return;
+        var m = versionRe.exec(t);
+        if(!m || m[1] === APP_VERSION) return;
+        var flag = "leMieOre.reloadedFor";
+        try{
+          if(sessionStorage.getItem(flag) === m[1]) return; // evita cicli di ricaricamento
+          sessionStorage.setItem(flag, m[1]);
+        }catch(e){}
+        location.reload();
+      })
+      .catch(function(){});
+  }
+  checkForUpdate();
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "visible") checkForUpdate();
+  });
 
   if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
     navigator.serviceWorker.register("sw.js").catch(function(){});
