@@ -28,7 +28,7 @@
   html,body{margin:0; padding:0; background:var(--bg); color:var(--text);}
   body{
     font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-    padding-bottom:48px;
+    padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 84px);
     min-height:100vh;
   }
   .wrap{max-width:520px; margin:0 auto; padding:0 16px;}
@@ -242,8 +242,26 @@
   }
   .settings-panel.open{display:block;}
 
+
+  /* ---- schede ---- */
+  .tab-page{display:none;}
+  .tab-page.active{display:block;}
+  .tabbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex;
+    background:var(--surface); border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .tabbar button{
+    flex:1; background:none; border:none; color:var(--muted); font-family:inherit;
+    font-size:11.5px; font-weight:600; padding:9px 0 8px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+  }
+  .tabbar button .ic{font-size:19px; line-height:1;}
+  .tabbar button.active{color:var(--accent);}
+  .tabbar button:active{background:var(--surface-2);}
+
   .toast{
-    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom, 0px) + 82px); transform:translateX(-50%);
     background:var(--surface-2); border:1px solid var(--line); color:var(--text);
     padding:10px 16px; border-radius:8px; font-size:13.5px; opacity:0; pointer-events:none;
     transition:opacity .2s ease, transform .2s ease; z-index:50; white-space:nowrap;
@@ -311,7 +329,7 @@
 </header>
 
 <div class="wrap">
-
+  <section class="tab-page active" id="tab-ore">
   <div class="stats">
     <div class="stat time"><div class="label">Ore mese</div><div class="value" id="statHours">0h 00m</div></div>
     <div class="stat money"><div class="label">Totale maturato</div><div class="value" id="statTotal">€0,00</div></div>
@@ -320,44 +338,6 @@
     <div class="stat reimb"><div class="label">🧾 Rimborsi <small>(non inclusi nel guadagno)</small></div><div class="value" id="statReimb">€0,00</div></div>
   </div>
 
-  <div class="settings-panel" id="settingsPanel">
-    <h2>Impostazioni</h2>
-    <div class="field">
-      <label for="rateInput">Tariffa oraria (€/h)</label>
-      <input type="number" id="rateInput" min="0" step="0.5" inputmode="decimal">
-    </div>
-    <div class="field">
-      <label for="bonusInput">Rimborso auto propria per uscita (€)</label>
-      <input type="number" id="bonusInput" min="0" step="1" inputmode="decimal">
-    </div>
-    <div class="field" style="margin-bottom:0">
-      <label>Ore previste di default (per il guadagno ipotetico del calendario)</label>
-      <div class="row2">
-        <div class="field" style="margin-bottom:10px">
-          <label for="hEsame">Esame</label>
-          <input type="number" id="hEsame" min="0.5" step="0.5" inputmode="decimal">
-        </div>
-        <div class="field" style="margin-bottom:10px">
-          <label for="hSimulatore">Simulatore</label>
-          <input type="number" id="hSimulatore" min="0.5" step="0.5" inputmode="decimal">
-        </div>
-      </div>
-      <div class="row2">
-        <div class="field" style="margin-bottom:0">
-          <label for="hCommissione">Commissione</label>
-          <input type="number" id="hCommissione" min="0.5" step="0.5" inputmode="decimal">
-        </div>
-        <div class="field" style="margin-bottom:0">
-          <label for="hAltro">Altro</label>
-          <input type="number" id="hAltro" min="0.5" step="0.5" inputmode="decimal">
-        </div>
-      </div>
-    </div>
-    <div class="form-actions" style="margin-top:14px">
-      <button class="btn-cancel" id="settingsClose">Chiudi</button>
-      <button class="btn-save" id="settingsSave">Salva</button>
-    </div>
-  </div>
 
   <div class="timer-panel">
     <div class="timer-status" id="timerStatus">Nessun lavoro in corso</div>
@@ -442,6 +422,9 @@
     <div class="records" id="recordsList"></div>
   </div>
 
+  </section>
+
+  <section class="tab-page" id="tab-cal">
   <div class="section">
     <div class="month-row" style="margin-bottom:10px"><h2>Calendario</h2></div>
     <button class="link-btn" id="toggleCalFormBtn" style="margin-bottom:10px">＋ AGGIUNGI AL CALENDARIO</button>
@@ -545,6 +528,48 @@
     <div class="records" id="eventList" style="margin-top:16px"></div>
   </div>
 
+  </section>
+
+  <section class="tab-page" id="tab-set">
+  <div class="settings-panel open" id="settingsPanel">
+    <h2>Impostazioni</h2>
+    <div class="field">
+      <label for="rateInput">Tariffa oraria (€/h)</label>
+      <input type="number" id="rateInput" min="0" step="0.5" inputmode="decimal">
+    </div>
+    <div class="field">
+      <label for="bonusInput">Rimborso auto propria per uscita (€)</label>
+      <input type="number" id="bonusInput" min="0" step="1" inputmode="decimal">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Ore previste di default (per il guadagno ipotetico del calendario)</label>
+      <div class="row2">
+        <div class="field" style="margin-bottom:10px">
+          <label for="hEsame">Esame</label>
+          <input type="number" id="hEsame" min="0.5" step="0.5" inputmode="decimal">
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label for="hSimulatore">Simulatore</label>
+          <input type="number" id="hSimulatore" min="0.5" step="0.5" inputmode="decimal">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label for="hCommissione">Commissione</label>
+          <input type="number" id="hCommissione" min="0.5" step="0.5" inputmode="decimal">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="hAltro">Altro</label>
+          <input type="number" id="hAltro" min="0.5" step="0.5" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+    <div class="form-actions" style="margin-top:14px">
+      <button class="btn-cancel" id="settingsClose">Indietro</button>
+      <button class="btn-save" id="settingsSave">Salva</button>
+    </div>
+  </div>
+
   <div class="section">
     <h2>Backup</h2>
     <p class="note">I dati restano sul dispositivo. Usa il backup per conservarne una copia in caso di cambio/reset dell'iPhone. Il backup include registrazioni, impostazioni e calendario.</p>
@@ -554,8 +579,15 @@
     </div>
     <input type="file" id="importFile" accept="application/json">
   </div>
+  </section>
 
 </div>
+
+<nav class="tabbar" id="tabbar">
+  <button type="button" data-tab="ore" class="active"><span class="ic">⏱</span><span>Ore</span></button>
+  <button type="button" data-tab="cal"><span class="ic">📅</span><span>Calendario</span></button>
+  <button type="button" data-tab="set"><span class="ic">⚙</span><span>Impostazioni</span></button>
+</nav>
 
 <div class="toast" id="toast"></div>
 
@@ -1399,15 +1431,31 @@
   var settingsPanel = $("settingsPanel");
   var HOUR_INPUTS = { Esame: "hEsame", Simulatore: "hSimulatore", Commissione: "hCommissione", Altro: "hAltro" };
 
-  $("gearBtn").addEventListener("click", function(){
+  function fillSettings(){
     $("rateInput").value = settings.rate;
     $("bonusInput").value = settings.bonus;
     Object.keys(HOUR_INPUTS).forEach(function(t){ $(HOUR_INPUTS[t]).value = settings.hoursByType[t]; });
-    settingsPanel.classList.toggle("open");
+  }
+
+  // ---------- schede ----------
+  var TAB_KEY = "leMieOre.tab";
+  function showTab(name){
+    if(["ore","cal","set"].indexOf(name) === -1) name = "ore";
+    Array.prototype.forEach.call(document.querySelectorAll(".tab-page"), function(el){
+      el.classList.toggle("active", el.id === "tab-" + name);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#tabbar button"), function(b){
+      b.classList.toggle("active", b.getAttribute("data-tab") === name);
+    });
+    if(name === "set") fillSettings();
+    try{ localStorage.setItem(TAB_KEY, name); }catch(e){}
+    window.scrollTo(0, 0);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("#tabbar button"), function(b){
+    b.addEventListener("click", function(){ showTab(b.getAttribute("data-tab")); });
   });
-  $("settingsClose").addEventListener("click", function(){
-    settingsPanel.classList.remove("open");
-  });
+  $("gearBtn").addEventListener("click", function(){ showTab("set"); });
+  $("settingsClose").addEventListener("click", function(){ showTab("ore"); });
   $("settingsSave").addEventListener("click", function(){
     var rate = parseFloat($("rateInput").value);
     var bonus = parseFloat($("bonusInput").value);
@@ -1418,7 +1466,6 @@
       if(!isNaN(h) && h > 0) settings.hoursByType[t] = h;
     });
     save(SETTINGS_KEY, settings);
-    settingsPanel.classList.remove("open");
     renderAll();
     renderCalendar();
     toast("Impostazioni salvate");
@@ -1487,6 +1534,10 @@
   renderAll();
   renderCalendar();
   attachCalendarSync();
+  fillSettings();
+  var lastTab = "ore";
+  try{ lastTab = localStorage.getItem(TAB_KEY) || "ore"; }catch(e){}
+  showTab(lastTab);
 
   if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
     navigator.serviceWorker.register("sw.js").catch(function(){});
