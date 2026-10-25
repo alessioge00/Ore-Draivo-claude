@@ -323,7 +323,7 @@
 
 <header class="top">
   <div class="inner">
-    <h1><span class="dot"></span>Le mie ore <span class="ver">v2.1.1</span></h1>
+    <h1><span class="dot"></span>Le mie ore <span class="ver">v2.1.2</span></h1>
     <button class="gear" id="gearBtn" aria-label="Impostazioni">⚙</button>
   </div>
 </header>
@@ -878,6 +878,7 @@
     applyFormRules();
     $("formTitle").textContent = prefill.title || "Nuova registrazione";
     pendingCalendarId = prefill.calendarId || null;
+    showTab("ore");
     formPanel.classList.add("open");
     toggleFormBtn.textContent = "－ Nascondi modulo";
     formPanel.scrollIntoView({behavior:"smooth", block:"nearest"});
@@ -1112,10 +1113,10 @@
   });
   $("calImportCancel").addEventListener("click", closeCalImport);
 
-  // Chiave anti-doppioni: un solo Esame per giorno e fascia; per gli altri tipi giorno + tipo + orario
+  // Chiave anti-doppioni: un solo Esame per giorno e fascia; per gli altri tipi giorno + tipo + orario (la nota non conta)
   function calKey(c){
     if(c.type === "Esame") return [c.date, "Esame", c.fascia || ""].join("|");
-    return [c.date, c.type, c.orario || "", c.type === "Altro" ? (c.note || "").toLowerCase() : ""].join("|");
+    return [c.date, c.type, c.orario || ""].join("|");
   }
   function hashStr(str){
     var h = 5381;
@@ -1550,7 +1551,7 @@
 
   // ---------- aggiornamento automatico ----------
   // Va cambiato a ogni nuova versione dell'app: se online c'è un numero diverso, l'app si ricarica.
-  var APP_VERSION = "2.1.1";
+  var APP_VERSION = "2.1.2";
   var versionRe = new RegExp("APP_VERSION\\s*=\\s*\"([^\"]+)\"");
   function checkForUpdate(){
     if(!navigator.onLine) return;
